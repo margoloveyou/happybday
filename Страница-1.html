@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Правда-правда??</title>
+<style>
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  html, body {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+  }
+
+  body {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, #ffdde1, #ee9ca7);
+    font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+    text-align: center;
+    padding: 20px;
+  }
+
+  .card {
+    background: rgba(255, 255, 255, 0.88);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    padding: 50px 40px;
+    border-radius: 24px;
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.15);
+    max-width: 500px;
+    width: 100%;
+    position: relative;
+    z-index: 2;
+  }
+
+  h1 {
+    font-size: 28px;
+    color: #c2185b;
+    margin-bottom: 30px;
+    line-height: 1.4;
+    word-wrap: break-word;
+    min-height: 40px;
+  }
+
+  .btn {
+    background: #e91e63;
+    color: #fff;
+    border: none;
+    padding: 16px 50px;
+    font-size: 20px;
+    font-weight: 600;
+    border-radius: 50px;
+    cursor: pointer;
+    box-shadow: 0 8px 20px rgba(233, 30, 99, 0.4);
+    transition: background 0.2s, box-shadow 0.2s;
+    position: relative;
+    z-index: 3;
+    touch-action: manipulation;
+    -webkit-user-select: none;
+    user-select: none;
+    white-space: nowrap;
+    max-width: 90vw;
+  }
+
+  .btn:hover {
+    background: #d81b60;
+    box-shadow: 0 12px 28px rgba(233, 30, 99, 0.5);
+  }
+
+  /* «Убегающий» режим: fixed, позиционируем через transform */
+  .btn.escaping {
+    position: fixed;
+    top: 0;
+    left: 0;
+    margin: 0;
+    transform: translate(0, 0);
+  }
+
+  .counter {
+    margin-top: 25px;
+    font-size: 14px;
+    color: #ad1457;
+    opacity: 0.7;
+    min-height: 20px;
+  }
+
+  .heart {
+    position: fixed;
+    opacity: 0.15;
+    pointer-events: none;
+    animation: float 6s ease-in-out infinite;
+    z-index: 1;
+    will-change: transform;
+  }
+
+  @keyframes float {
+    0%, 100% { transform: translateY(0) rotate(0deg); }
+    50%       { transform: translateY(-30px) rotate(15deg); }
+  }
+
+  @media (max-width: 480px) {
+    .card { padding: 40px 22px; border-radius: 20px; }
+    h1 { font-size: 22px; margin-bottom: 24px; }
+    .btn { padding: 14px 36px; font-size: 18px; }
+    .counter { font-size: 13px; }
+  }
+</style>
+</head>
+<body>
+
+  <div class="card">
+    <h1 id="question">Правда-правда??</h1>
+    <button class="btn" id="yesBtn" type="button">Да</button>
+    <div class="counter" id="counter"></div>
+  </div>
+
+<script>
+  // ====== НАСТРОЙКИ ======
+  const FINAL_URL = 'https://wa.me/79627375820?text=%D0%BB%D1%8E%D0%B1%D0%BB%D1%8E%20%D1%82%D0%B5%D0%B1%D1%8F%E2%9D%A4%EF%B8%8F';
+  const RUN_AWAY_COUNT = 3;
+
+  // Диапазон в процентах от экрана
+  const RANGE_MIN = 0.10;
+  const RANGE_MAX = 0.90;
+
+  // Минимальный отступ от краёв в пикселях
+  const MIN_PX = 20;
+  // ========================
+
+  const btn = document.getElementById('yesBtn');
+  const question = document.getElementById('question');
+  const counter = document.getElementById('counter');
+
+  let escapes = 0;
+  let isEscaping = false;
+
+  // ----- Сердечки -----
+  (function createHearts() {
+    const symbols = ['❤️', '💖', '💕', '🌸', '✨'];
+    const count = window.innerWidth < 600 ? 8 : 14;
+    for (let i = 0; i < count; i++) {
+      const h = document.createElement('div');
+      h.className = 'heart';
+      h.textContent = symbols[Math.floor(Math.random() * symbols.length)];
+      h.style.left = Math.random() * 100 + 'vw';
+      h.style.top = Math.random() * 100 + 'vh';
+      h.style.animationDelay = Math.random() * 6 + 's';
+      h.style.fontSize = (16 + Math.random() * 20) + 'px';
+      document.body.appendChild(h);
+    }
+  })();
+
+  // ----- Размеры видимой области -----
+  function getViewport() {
+    // innerWidth/innerHeight — самые надёжные для fixed-элементов
+    return {
+      w: window.innerWidth,
+      h: window.innerHeight
+    };
+  }
+
+  // ----- Телепорт кнопки -----
+  function teleportButton() {
+    // 1. Первый раз: переводим в fixed и запоминаем текущую позицию через transform
+    if (!isEscaping) {
+      const r = btn.getBoundingClientRect();
+      btn.style.transform = `translate(${r.left}px, ${r.top}px)`;
+      void btn.offsetWidth;
+      btn.classList.add('escaping');
+      isEscaping = true;
+      // Даём браузеру применить fixed, потом телепортируем
+      requestAnimationFrame(() => {
+        doTeleport();
+      });
+      return;
+    }
+
+    doTeleport();
+  }
+
+  function doTeleport() {
+    const vp = getViewport();
+
+    // Размеры кнопки — берём из offsetWidth/offsetHeight,
+    // они не зависят от трансформаций и позиционирования
+    const bw = btn.offsetWidth;
+    const bh = btn.offsetHeight;
+
+    // Границы для позиции (левый верхний угол через transform)
+    const minX = Math.max(MIN_PX, vp.w * RANGE_MIN);
+    const maxX = Math.min(vp.w * RANGE_MAX, vp.w - bw - MIN_PX);
+    const minY = Math.max(MIN_PX, vp.h * RANGE_MIN);
+    const maxY = Math.min(vp.h * RANGE_MAX, vp.h - bh - MIN_PX);
+
+    // Если диапазон отрицательный — ставим в центр
+    let x, y;
+    if (maxX <= minX) {
+      x = Math.max(MIN_PX, (vp.w - bw) / 2);
+    } else {
+      x = minX + Math.random() * (maxX - minX);
+    }
+    if (maxY <= minY) {
+      y = Math.max(MIN_PX, (vp.h - bh) / 2);
+    } else {
+      y = minY + Math.random() * (maxY - minY);
+    }
+
+    // Финальная страховка
+    x = Math.max(MIN_PX, Math.min(x, vp.w - bw - MIN_PX));
+    y = Math.max(MIN_PX, Math.min(y, vp.h - bh - MIN_PX));
+
+    btn.style.transform = `translate(${x}px, ${y}px)`;
+  }
+
+  // ----- Текст вопроса -----
+  function updateQuestion() {
+    if (escapes === 1) question.textContent = 'Точно-точно??';
+    if (escapes === 2) question.textContent = 'Ну ладно... последний раз?';
+    if (escapes === 3) question.textContent = 'Хорошо, лови! 💌';
+  }
+
+  // ----- Клик -----
+  function handleClick(e) {
+    if (escapes < RUN_AWAY_COUNT) {
+      e.preventDefault();
+      escapes++;
+      teleportButton();
+      updateQuestion();
+      counter.textContent = `Попытка ${escapes} из ${RUN_AWAY_COUNT}`;
+    } else {
+      window.location.href = FINAL_URL;
+    }
+  }
+
+  btn.addEventListener('click', handleClick);
+
+  // ----- Возврат при resize/повороте -----
+  function clampButton() {
+    if (!isEscaping) return;
+    doTeleport();
+  }
+
+  window.addEventListener('resize', clampButton);
+  window.addEventListener('orientationchange', () => setTimeout(clampButton, 400));
+</script>
+</body>
+</html>
